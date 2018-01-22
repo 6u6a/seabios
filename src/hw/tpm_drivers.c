@@ -90,11 +90,11 @@ static u32 tis_probe(void)
     return rc;
 }
 
-static TPMVersion tis_get_tpm_version(void)
+static TPMVersion tis_get_tpm_version(void)//get tpm_tis version value
 {
     /* TPM 2 has an interface register */
     u32 ifaceid = readl(TIS_REG(0, TIS_REG_IFACE_ID));
-
+	dprintf(DEBUG_tcg, "tis_get_tpm_version() get ifaceid: 0x%x\n", ifaceid);
     if ((ifaceid & 0xf) == 0) {
         /* TPM 2 */
         return TPM_VERSION_2;
@@ -354,7 +354,7 @@ struct tpm_driver tpm_drivers[TPM_NUM_DRIVERS] = {
 static u8 TPMHW_driver_to_use = TPM_INVALID_DRIVER;
 
 TPMVersion
-tpmhw_probe(void)
+tpmhw_probe(void)//get tpm's version
 {
     unsigned int i;
     for (i = 0; i < TPM_NUM_DRIVERS; i++) {

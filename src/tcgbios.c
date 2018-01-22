@@ -566,6 +566,7 @@ tpm_extend(struct tpm_log_entry *le, int digest_len)
 static int
 tpm20_stirrandom(void)
 {
+	dprintf(DEBUG_tcg, "tpm20_stirrandom() start!\n");
     struct tpm2_req_stirrandom stir = {
         .hdr.tag = cpu_to_be16(TPM2_ST_NO_SESSIONS),
         .hdr.totlen = cpu_to_be32(sizeof(stir)),
@@ -969,7 +970,8 @@ tpm_setup(void)
 static void
 tpm20_prepboot(void)
 {
-    int ret = tpm20_stirrandom();
+    dprintf(DEBUG_tcg, "tpm20_prepboot() start!");
+	int ret = tpm20_stirrandom();
     if (ret)
          goto err_exit;
 
@@ -993,6 +995,7 @@ err_exit:
 void
 tpm_prepboot(void)
 {
+	dprintf(DEBUG_tcg, "tpm_prepboot() start!\n");
     if (!CONFIG_TCGBIOS)
         return;
 
