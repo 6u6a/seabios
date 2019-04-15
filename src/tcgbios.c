@@ -59,6 +59,7 @@ tpm_tcpa_probe(void)
     u32 log_area_minimum_length = tcpa->log_area_minimum_length;
     if (!log_area_start_address || !log_area_minimum_length)
         return -1;
+	dprintf(DEBUG_tcg, "(6u6a)log_area_start_address = 0x%lx, log_area_minimum_length = 0x%x\n", (unsigned long)log_area_start_address, log_area_minimum_length);
 
     memset(log_area_start_address, 0, log_area_minimum_length);
     tpm_state.log_area_start_address = log_area_start_address;
@@ -88,27 +89,32 @@ tpm_log_event(struct tpm_log_header *entry, int digest_len
     dprintf(DEBUG_tcg, "TCGBIOS: LASA = %p, next entry = %p\n",
             tpm_state.log_area_start_address, tpm_state.log_area_next_entry);
 
-    if (tpm_state.log_area_next_entry == NULL)
+    if (tpm_state.log_area_next_entry == NULL)//有存储空间
         return -1;
 
     u32 size = (sizeof(*entry) + digest_len
-                + sizeof(struct tpm_log_trailer) + event_len);
+                + sizeof(struct tpm_log_trailer) + event_len);//计算度量记录的长度
     u32 logsize = (tpm_state.log_area_next_entry + size
-                   - tpm_state.log_area_start_address);
-    if (logsize > tpm_state.log_area_minimum_length) {
+                   - tpm_state.log_area_start_address);//计算新记录添加后日志的总长度
+    if (logsize > tpm_state.log_area_minimum_length) {//日志总长度限制
         dprintf(DEBUG_tcg, "TCGBIOS: LOG OVERFLOW: size = %d\n", size);
         return -1;
     }
 
     void *dest = tpm_state.log_area_next_entry;
-    memcpy(dest, entry, sizeof(*entry) + digest_len);
+    memcpy(dest, entry, sizeof(*entry) + digest_len);//拷贝记录头部—度量值
     struct tpm_log_trailer *t = dest + sizeof(*entry) + digest_len;
     t->eventdatasize = event_len;
-    memcpy(t->event, event, event_len);
-
-    tpm_state.log_area_last_entry = tpm_state.log_area_next_entry;
-    tpm_state.log_area_next_entry += size;
-    tpm_state.entry_count++;
+    memcpy(t->event, event, event_len);//拷贝记录尾部—事件
+	dprintf(DEBUG_tcg, "tpm_log_event(header):");
+	int i;
+	for(i = 0; i < sizeof(*entry) + digest_len; i ++){
+		dprintf(DEBUG_tcg, "%02x", 0xff & ((char *)dest)[i]);
+	}
+	dprintf(DEBUG_tcg, "\n");
+    tpm_state.log_area_last_entry = tpm_state.log_area_next_entry;//更新当前最后一条记录
+    tpm_state.log_area_next_entry += size;//更新下一个可以填充记录的位置
+    tpm_state.entry_count++;//更新记录的总个数
 
     return 0;
 }
@@ -507,6 +513,12 @@ tpm12_extend(struct tpm_log_entry *le, int digest_len)
         .pcrindex    = cpu_to_be32(le->hdr.pcrindex),
     };
     memcpy(tre.digest, le->hdr.digest, sizeof(tre.digest));
+    int i = 0;
+    dprintf(DEBUG_tcg, "tpm12_extend: ");
+    for(i = 0; i < digest_len; i ++){//-----------------------------------------------------------------------------
+        dprintf(DEBUG_tcg, "%02x", 0xff & le->hdr.digest[i]);
+    }
+    dprintf(DEBUG_tcg, "\n");
 
     struct tpm_rsp_extend rsp;
     u32 resp_length = sizeof(rsp);
@@ -519,7 +531,7 @@ tpm12_extend(struct tpm_log_entry *le, int digest_len)
 }
 
 static int tpm20_extend(struct tpm_log_entry *le, int digest_len)
-{
+{//seabios中存在只进行了扩展操作，但是没有记录到日志中的连个操作。
     struct tpm2_req_extend tmp_tre = {
         .hdr.tag     = cpu_to_be16(TPM2_ST_SESSIONS),
         .hdr.totlen  = cpu_to_be32(0),
@@ -538,9 +550,14 @@ static int tpm20_extend(struct tpm_log_entry *le, int digest_len)
 
     memcpy(tre, &tmp_tre, sizeof(tmp_tre));
     memcpy(&tre->digest[0], le->hdr.digest, digest_len);
-
+	int i = 0;
+	dprintf(DEBUG_tcg, "tpm20_extend: ");
+	for(i = 0; i < digest_len; i ++){//-----------------------------------------------------------------------------
+		dprintf(DEBUG_tcg, "%02x", 0xff & le->hdr.digest[i]);
+	}
+	dprintf(DEBUG_tcg, "\n");
     tre->hdr.totlen = cpu_to_be32(sizeof(tmp_tre) + digest_len);
-
+	
     struct tpm_rsp_header rsp;
     u32 resp_length = sizeof(rsp);
     int ret = tpmhw_transmit(0, &tre->hdr, &rsp, &resp_length,
@@ -1387,7 +1404,7 @@ tpm_interrupt_handler32(struct bregs *regs)
 {
     if (!CONFIG_TCGBIOS)
         return;
-
+	dprintf(DEBUG_tcg, "tpm_interrupt_handler32 exec!\n");
     set_cf(regs, 0);
 
     if (TPM_interface_shutdown && regs->al) {

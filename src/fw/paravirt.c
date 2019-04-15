@@ -476,6 +476,7 @@ qemu_cfg_e820(void)
 
     // QEMU_CFG_E820_TABLE has reservations only
     u32 count32;
+    dprintf(1, "runingOnKVM() returns 0x%x\n", runningOnKVM());
     qemu_cfg_read_entry(&count32, QEMU_CFG_E820_TABLE, sizeof(count32));
     if (count32) {
         struct e820_reservation entry;
